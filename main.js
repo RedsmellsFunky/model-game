@@ -1,90 +1,69 @@
 import * as THREE from 'three';
+import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { FBXLoader } from 'three/addons/loaders/FBXLoader.js';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 
 // --- CONFIGURATION ---
+const MODEL_PATH = 'path/to/your/model.glb'; // Change to .fbx or .glb
+const IS_GLB = MODEL_PATH.endsWith('.glb') || MODEL_PATH.endsWith('.gltf');
+
+// --- SCENE SETUP ---
 const scene = new THREE.Scene();
-scene.background = new THREE.Color(0x87ceeb); // Sky blue
-scene.fog = new THREE.Fog(0x87ceeb, 10, 50);
+scene.background = new THREE.Color(0x222222);
 
 const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+camera.position.set(0, 2, 5);
+
 const renderer = new THREE.WebGLRenderer({ antialias: true });
 renderer.setSize(window.innerWidth, window.innerHeight);
-renderer.shadowMap.enabled = true;
-document.body.appendChild(renderer.domElement);
+document.getElementById('container').appendChild(renderer.domElement);
 
-// --- LIGHTING ---
-const ambientLight = new THREE.HemisphereLight(0xffffff, 0x444444, 1);
-scene.add(ambientLight);
+const controls = new OrbitControls(camera, renderer.domElement);
+const light = new THREE.HemisphereLight(0xffffff, 0x444444, 2);
+scene.add(light);
 
-const sunLight = new THREE.DirectionalLight(0xffffff, 1.5);
-sunLight.position.set(5, 10, 5);
-sunLight.castShadow = true;
-scene.add(sunLight);
+// --- FALLBACK: THE CAPSULE ---
+function createCapsuleFallback() {
+    const geometry = new THREE.CapsuleGeometry(0.5, 1, 4, 8);
+    const material = new THREE.MeshStandardMaterial({ color: 0xff0055 });
+    const capsule = new THREE.Mesh(geometry, material);
+    capsule.position.y = 1; 
+    scene.add(capsule);
+    document.getElementById('status').innerText = "Error Loading Model: Using Capsule Fallback";
+}
 
-// --- FLOOR ---
-const floor = new THREE.Mesh(
-    new THREE.PlaneGeometry(100, 100),
-    new THREE.MeshStandardMaterial({ color: 0x333333 })
-);
-floor.rotation.x = -Math.PI / 2;
-floor.receiveShadow = true;
-scene.add(floor);
+// --- MODEL LOADER ---
+const loader = IS_GLB ? new GLTFLoader() : new FBXLoader();
 
-// --- MODEL LOADING ---
-let mixer, playerModel;
-const clock = new THREE.Clock();
-const loader = new FBXLoader();
-
-// REPLACE 'your_model.fbx' with your actual filename!
-loader.load('models/your_model.fbx', (fbx) => {
-    playerModel = fbx;
-    playerModel.scale.setScalar(0.01); // Adjust if model is too big/small
-    
-    playerModel.traverse(c => {
-        if (c.isMesh) c.castShadow = true;
-    });
-
-    scene.add(playerModel);
-
-    if (fbx.animations.length > 0) {
-        mixer = new THREE.AnimationMixer(fbx);
-        const action = mixer.clipAction(fbx.animations[0]);
-        action.play();
+loader.load(
+    MODEL_PATH,
+    (object) => {
+        // Success Logic
+        const model = IS_GLB ? object.scene : object;
+        scene.add(model);
+        document.getElementById('status').innerText = "Model Loaded Successfully";
+    },
+    (xhr) => {
+        console.log((xhr.loaded / xhr.total * 100) + '% loaded');
+    },
+    (error) => {
+        // Error Logic
+        console.error("An error happened during loading:", error);
+        createCapsuleFallback();
     }
-});
+);
 
-// --- INPUTS ---
-const keys = { w: false, a: false, s: false, d: false };
-window.onkeydown = (e) => keys[e.key.toLowerCase()] = true;
-window.onkeyup = (e) => keys[e.key.toLowerCase()] = false;
-
-// --- GAME LOOP ---
+// --- ANIMATION LOOP ---
 function animate() {
     requestAnimationFrame(animate);
-    const delta = clock.getDelta();
-
-    if (mixer) mixer.update(delta);
-
-    if (playerModel) {
-        const speed = 0.1;
-        if (keys.w) playerModel.position.z -= speed;
-        if (keys.s) playerModel.position.z += speed;
-        if (keys.a) playerModel.position.x -= speed;
-        if (keys.d) playerModel.position.x += speed;
-
-        // Simple third-person camera follow
-        camera.position.set(playerModel.position.x, playerModel.position.y + 4, playerModel.position.z + 8);
-        camera.lookAt(playerModel.position);
-    }
-
+    controls.update();
     renderer.render(scene, camera);
 }
 
-animate();
-
-// Resize handling
-window.onresize = () => {
+window.addEventListener('resize', () => {
     camera.aspect = window.innerWidth / window.innerHeight;
     camera.updateProjectionMatrix();
     renderer.setSize(window.innerWidth, window.innerHeight);
-};
+});
+
+animate();
