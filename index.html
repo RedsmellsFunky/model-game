@@ -3,121 +3,125 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>3D Character Runner</title>
+    <title>Classic Snake</title>
     <style>
-        body { margin: 0; overflow: hidden; background-color: #111; }
-        #instructions {
-            position: absolute;
-            top: 10px;
-            left: 10px;
+        body {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            margin: 0;
+            background-color: #2c3e50;
             color: white;
-            font-family: sans-serif;
-            background: rgba(0,0,0,0.5);
-            padding: 10px;
-            pointer-events: none;
+            font-family: Arial, sans-serif;
+            flex-direction: column;
         }
+        canvas {
+            border: 5px solid #ecf0f1;
+            box-shadow: 0 0 20px rgba(0,0,0,0.5);
+            background-color: #000;
+        }
+        h1 { margin-bottom: 10px; }
+        .score { font-size: 24px; margin-bottom: 10px; }
     </style>
 </head>
 <body>
-    <div id="instructions">Use WASD or Arrow Keys to Move</div>
-    
-    <script type="importmap">
-        {
-            "imports": {
-                "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
-                "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
+
+    <h1>Snake JS</h1>
+    <div class="score">Score: <span id="scoreVal">0</span></div>
+    <canvas id="snakeGame" width="400" height="400"></canvas>
+
+    <script>
+        const canvas = document.getElementById("snakeGame");
+        const ctx = canvas.getContext("2d");
+        const scoreElement = document.getElementById("scoreVal");
+
+        const box = 20; // Size of one square
+        let score = 0;
+        let gameSpeed = 100;
+
+        // Initialize snake in the middle
+        let snake = [{ x: 9 * box, y: 10 * box }];
+
+        // Initialize food
+        let food = {
+            x: Math.floor(Math.random() * 19 + 1) * box,
+            y: Math.floor(Math.random() * 19 + 1) * box
+        };
+
+        let d; // Direction
+
+        document.addEventListener("keydown", direction);
+
+        function direction(event) {
+            if(event.keyCode == 37 && d != "RIGHT") d = "LEFT";
+            else if(event.keyCode == 38 && d != "DOWN") d = "UP";
+            else if(event.keyCode == 39 && d != "LEFT") d = "RIGHT";
+            else if(event.keyCode == 40 && d != "UP") d = "DOWN";
+        }
+
+        function collision(head, array) {
+            for(let i = 0; i < array.length; i++) {
+                if(head.x == array[i].x && head.y == array[i].y) return true;
             }
-        }
-    </script>
-
-    <script type="module">
-        import * as THREE from 'three';
-
-        // --- SCENE SETUP ---
-        const scene = new THREE.Scene();
-        scene.background = new THREE.Color(0x87ceeb); // Sky blue
-        scene.fog = new THREE.Fog(0x87ceeb, 10, 50);
-
-        const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
-        const renderer = new THREE.WebGLRenderer({ antialias: true });
-        renderer.setSize(window.innerWidth, window.innerHeight);
-        renderer.shadowMap.enabled = true;
-        document.body.appendChild(renderer.domElement);
-
-        // --- LIGHTING ---
-        const hemiLight = new THREE.HemisphereLight(0xffffff, 0x444444, 1);
-        scene.add(hemiLight);
-
-        const dirLight = new THREE.DirectionalLight(0xffffff, 1);
-        dirLight.position.set(5, 10, 5);
-        dirLight.castShadow = true;
-        scene.add(dirLight);
-
-        // --- THE FLOOR ---
-        const floorGeometry = new THREE.PlaneGeometry(100, 100);
-        const floorMaterial = new THREE.MeshStandardMaterial({ color: 0x228b22 });
-        const floor = new THREE.Mesh(floorGeometry, floorMaterial);
-        floor.rotation.x = -Math.PI / 2;
-        floor.receiveShadow = true;
-        scene.add(floor);
-
-        // --- THE PLAYER (A Placeholder Mannequin) ---
-        // In a real game, you would use GLTFLoader to load a .glb file here
-        const playerGroup = new THREE.Group();
-        
-        const bodyGeom = new THREE.CapsuleGeometry(0.4, 1, 4, 8);
-        const bodyMat = new THREE.MeshStandardMaterial({ color: 0xff4444 });
-        const body = new THREE.Mesh(bodyGeom, bodyMat);
-        body.position.y = 0.9;
-        body.castShadow = true;
-        playerGroup.add(body);
-
-        const headGeom = new THREE.SphereGeometry(0.25);
-        const head = new THREE.Mesh(headGeom, bodyMat);
-        head.position.y = 1.7;
-        playerGroup.add(head);
-
-        scene.add(playerGroup);
-
-        // --- MOVEMENT LOGIC ---
-        const keys = { w: false, a: false, s: false, d: false };
-        const velocity = new THREE.Vector3();
-        const speed = 0.1;
-
-        window.addEventListener('keydown', (e) => { keys[e.key.toLowerCase()] = true; });
-        window.addEventListener('keyup', (e) => { keys[e.key.toLowerCase()] = false; });
-
-        camera.position.set(0, 5, 10);
-        camera.lookAt(playerGroup.position);
-
-        // --- ANIMATION LOOP ---
-        function animate() {
-            requestAnimationFrame(animate);
-
-            // Movement handling
-            if (keys.w || keys.ArrowUp) playerGroup.position.z -= speed;
-            if (keys.s || keys.ArrowDown) playerGroup.position.z += speed;
-            if (keys.a || keys.ArrowLeft) playerGroup.position.x -= speed;
-            if (keys.d || keys.ArrowRight) playerGroup.position.x += speed;
-
-            // Camera follow (Third Person)
-            camera.position.lerp(new THREE.Vector3(
-                playerGroup.position.x, 
-                playerGroup.position.y + 4, 
-                playerGroup.position.z + 8
-            ), 0.1);
-            camera.lookAt(playerGroup.position);
-
-            renderer.render(scene, camera);
+            return false;
         }
 
-        window.addEventListener('resize', () => {
-            camera.aspect = window.innerWidth / window.innerHeight;
-            camera.updateProjectionMatrix();
-            renderer.setSize(window.innerWidth, window.innerHeight);
-        });
+        function draw() {
+            // Clear background
+            ctx.fillStyle = "black";
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-        animate();
+            // Draw Snake
+            for(let i = 0; i < snake.length; i++) {
+                ctx.fillStyle = (i == 0) ? "#2ecc71" : "#27ae60";
+                ctx.fillRect(snake[i].x, snake[i].y, box, box);
+                
+                // Add a small border to snake segments
+                ctx.strokeStyle = "#000";
+                ctx.strokeRect(snake[i].x, snake[i].y, box, box);
+            }
+
+            // Draw Food
+            ctx.fillStyle = "#e74c3c";
+            ctx.fillRect(food.x, food.y, box, box);
+
+            // Old head position
+            let snakeX = snake[0].x;
+            let snakeY = snake[0].y;
+
+            // Move direction
+            if( d == "LEFT") snakeX -= box;
+            if( d == "UP") snakeY -= box;
+            if( d == "RIGHT") snakeX += box;
+            if( d == "DOWN") snakeY += box;
+
+            // Check if snake eats food
+            if(snakeX == food.x && snakeY == food.y) {
+                score++;
+                scoreElement.innerHTML = score;
+                food = {
+                    x: Math.floor(Math.random() * 19 + 1) * box,
+                    y: Math.floor(Math.random() * 19 + 1) * box
+                };
+            } else {
+                // Remove the tail
+                snake.pop();
+            }
+
+            let newHead = { x: snakeX, y: snakeY };
+
+            // Game Over rules
+            if(snakeX < 0 || snakeX >= canvas.width || snakeY < 0 || snakeY >= canvas.height || collision(newHead, snake)) {
+                clearInterval(game);
+                alert("Game Over! Your score: " + score);
+                location.reload(); // Restart game
+            }
+
+            snake.unshift(newHead);
+        }
+
+        let game = setInterval(draw, gameSpeed);
     </script>
 </body>
 </html>
